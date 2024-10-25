@@ -1,4 +1,5 @@
-﻿@model TodoViewModel
+@model ToDoViewModel
+
 
 <div class="row justify-content-center">
     <div class="col-xl-6 col-lg-8 col-md-8 col-sm-10">
@@ -7,23 +8,31 @@
                 <tr class="table-primary">
                     <th scope="col">Id</th>
                     <th scope="col">Name</th>
+                    <th> @* Button to sort list by Name*@
+                        <form action="/Home/Index" method="get"> @* Sorting happens in index function *@
+                            <input type="submit" name="sortOrder" class="btn btn-light" value="Sort by Name">
+                        </form>
+                    </th>
                     <th scope="col"></th>
                 </tr>
             </thead>
             <tbody>
-                @foreach (var t in Model.TodoList)
+                @foreach (var t in Model.ToDoList)
                 {
                     <tr>
-                        <th class="todos-column" scope="row">@t.Id</th>
+                        <td class="todos-column" scope="row">@t.Id</td>
                         <td class="todos-column">@t.Name</td>
                         <td class="buttons-column">
-                            <input type="submit" class="btn btn-danger" value="Delete" onClick="deleteTodo(@t.Id)" />
-                            <input type="submit" class="btn btn-primary" value="Update" onClick="populateForm(@t.Id)" />
+                            <input type="submit" class="btn btn-secondary" value="Delete" onclick="deleteToDo(@t.Id)">
+                            <input type="submit" class="btn btn-light" value="Update" onclick="populateForm(@t.Id)">
                         </td>
-
                     </tr>
                 }
             </tbody>
+            <script>
+                window.history.replaceState(null, null, "/"); //this ensures that if Sort by Name, Delete, or Update are clicked, they go back to the same base URL
+                                                                //otherwise, "Sort by Name" changes the URL and Delete/Update can't work
+            </script> 
         </table>
     </div>
 </div>
