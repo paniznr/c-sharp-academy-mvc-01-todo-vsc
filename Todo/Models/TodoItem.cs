@@ -1,10 +1,9 @@
-using System;
+namespace ToDo.Models;
 
-namespace Todo.Models
+public class ToDoItem
 {
-    public class TodoItem
-    {
-        public int Id { get; set; }
-        public string Name { get; set; }
-    }
+    public int Id { get; set; }
+    public string? Name { get; set; }
+
+    //public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 }
