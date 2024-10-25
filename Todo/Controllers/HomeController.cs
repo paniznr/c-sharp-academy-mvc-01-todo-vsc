@@ -1,173 +1,215 @@
-﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
-using Microsoft.Extensions.Logging;
-using Todo.Models;
-using Todo.Models.ViewModels;
+using ToDo.Models;
+using ToDo.Models.ViewModels;
 
-namespace Todo.Controllers
+namespace ToDo.Controllers;
+
+public class HomeController : Controller
 {
-    public class HomeController : Controller
+    private readonly ILogger<HomeController> _logger;
+
+    public HomeController(ILogger<HomeController> logger)
     {
-        private readonly ILogger<HomeController> _logger;
+        _logger = logger;
+    }
 
-        public HomeController(ILogger<HomeController> logger)
+    // In order to sort the list by name, I added additional checks to the Index() function
+    public IActionResult Index(string sortOrder = null) //sortOrder is activated by the "Sort by Name" button
+    {
+        // If sortOrder is null, check the session to see if it has been set previously
+        if (string.IsNullOrEmpty(sortOrder))
         {
-            _logger = logger;
+            sortOrder = HttpContext.Session.GetString("sortOrder");
         }
-
-        public IActionResult Index()
+        else
         {
-            var todoListViewModel = GetAllTodos();
-            return View(todoListViewModel);
+            // Store the sortOrder in the session for future requests
+            HttpContext.Session.SetString("sortOrder", sortOrder);
         }
+        var toDoListViewModel = string.IsNullOrEmpty(sortOrder) 
+                                ? GetAllToDos() // Fetch unsorted list if no sortOrder is passed
+                                : GetAllToDosSorted(); // Fetch sorted list if sortOrder is provided
+        return View(toDoListViewModel);
+    }
 
-        [HttpGet]
-        public JsonResult PopulateForm(int id)
+
+    [HttpGet]
+    public JsonResult PopulateForm(int id)
+    {
+        var toDo = GetById(id);
+        return Json(toDo);
+    }
+
+    //fetch data from DB to display To Do items
+    internal ToDoViewModel GetAllToDos() 
+    {
+        List<ToDoItem> toDoList = new();
+        using (SqliteConnection con = new SqliteConnection("Data Source=db.sqlite"))
         {
-            var todo = GetById(id);
-            return Json(todo);
-        }
-
-
-        internal TodoViewModel GetAllTodos()
-        {
-            List<TodoItem> todoList = new();
-
-            using (SqliteConnection con =
-                   new SqliteConnection("Data Source=db.sqlite"))
+            using (var tableCmd = con.CreateCommand())
             {
-                using (var tableCmd = con.CreateCommand())
+                con.Open();
+                tableCmd.CommandText = "SELECT * FROM ToDo";
+                using (var reader = tableCmd.ExecuteReader())
                 {
-                    con.Open();
-                    tableCmd.CommandText = "SELECT * FROM todo";
-
-                    using (var reader = tableCmd.ExecuteReader())
+                    if (reader.HasRows)
                     {
-                        if (reader.HasRows)
+                        while (reader.Read()) //while reader is reading data from db, when no more rows it will stop reading and exit
                         {
-                            while (reader.Read())
-                            {
-                                todoList.Add(
-                                    new TodoItem
-                                    {
-                                        Id = reader.GetInt32(0),
-                                        Name = reader.GetString(1)
-                                    });
-                            }
+                            toDoList.Add( //adding to our list
+                                new ToDoItem
+                                {
+                                    Id = reader.GetInt32(0),
+                                    Name = reader.GetString(1)
+                                });
                         }
-                        else
+                    } 
+                    else 
+                    {
+                        return new ToDoViewModel //empty because no rows
                         {
-                            return new TodoViewModel
-                            {
-                                TodoList = todoList
-                            };
-                        }
-                    };
+                            ToDoList = toDoList
+                        };
+                    }
+
                 }
             }
-
-            return new TodoViewModel
+            return new ToDoViewModel
             {
-                TodoList = todoList
+                ToDoList = toDoList
             };
+
         }
+        
+    }
 
-        internal TodoItem GetById(int id)
+    //Similar to GetAllToDos(), but uses ORDER BY in query to sort by Name
+    internal ToDoViewModel GetAllToDosSorted() 
+    {
+        List<ToDoItem> toDoList = new();
+        using (SqliteConnection con = new SqliteConnection("Data Source=db.sqlite"))
         {
-            TodoItem todo = new();
-
-            using (var connection =
-                   new SqliteConnection("Data Source=db.sqlite"))
+            using (var tableCmd = con.CreateCommand())
             {
-                using (var tableCmd = connection.CreateCommand())
+                con.Open();
+                tableCmd.CommandText = "SELECT * FROM ToDo ORDER BY Name";
+                using (var reader = tableCmd.ExecuteReader())
                 {
-                    connection.Open();
-                    tableCmd.CommandText = $"SELECT * FROM todo Where Id = '{id}'";
-
-                    using (var reader = tableCmd.ExecuteReader())
+                    if (reader.HasRows)
                     {
-                        if (reader.HasRows)
+                        while (reader.Read()) //while reader is reading data from db, when no more rows it will stop reading and exit
                         {
-                            reader.Read();
-                            todo.Id = reader.GetInt32(0);
-                            todo.Name = reader.GetString(1);
+                            toDoList.Add( //adding to our list
+                                new ToDoItem
+                                {
+                                    Id = reader.GetInt32(0),
+                                    Name = reader.GetString(1)
+                                });
                         }
-                        else
+                    } 
+                    else 
+                    {
+                        return new ToDoViewModel //empty because no rows
                         {
-                            return todo;
-                        }
-                    };
+                            ToDoList = toDoList
+                        };
+                    }
+
                 }
             }
-
-            return todo;
-        }
-
-        public RedirectResult Insert(TodoItem todo)
-        {
-            using (SqliteConnection con =
-                   new SqliteConnection("Data Source=db.sqlite"))
+            return new ToDoViewModel
             {
-                using (var tableCmd = con.CreateCommand())
+                ToDoList = toDoList
+            };
+
+        }
+        
+    }
+    internal ToDoItem GetById(int id)
+    {
+        ToDoItem toDo = new();
+        using (SqliteConnection connection = new SqliteConnection("Data Source=db.sqlite"))
+        {
+            using (var tableCmd = connection.CreateCommand())
+            {
+                connection.Open();
+                tableCmd.CommandText = $"SELECT * FROM toDo WHERE Id = '{id}'";
+
+                using (var reader = tableCmd.ExecuteReader())
                 {
-                    con.Open();
-                    tableCmd.CommandText = $"INSERT INTO todo (name) VALUES ('{todo.Name}')";
-                    try
+                    if (reader.HasRows)
                     {
-                        tableCmd.ExecuteNonQuery();
+                        reader.Read();
+                        toDo.Id = reader.GetInt32(0);
+                        toDo.Name = reader.GetString(1);
+                    } else {
+                        return toDo;
                     }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
+                };
+            }
+        }
+        return toDo;
+    }
+    public RedirectResult Insert(ToDoItem toDo) 
+    {
+        //With "using" because SQLite is an unmanaged resource that needs to be disposed of so we don't waste memory in background
+        using (SqliteConnection con = new SqliteConnection("Data Source=db.sqlite"))
+        {
+            using (var tableCmd = con.CreateCommand())
+            {
+                con.Open();
+                tableCmd.CommandText = $"INSERT INTO ToDo (name) VALUES ('{toDo.Name}')";
+                try
+                {
+                    tableCmd.ExecuteNonQuery(); //because we don't need anything to return
+                }
+                catch (Exception ex)
+                {
+                    System.Console.WriteLine(ex.Message);
                 }
             }
-            return Redirect("https://localhost:5001/");
         }
+        return Redirect("http://localhost:5146");
+    }
 
-        [HttpPost]
-        public JsonResult Delete(int id)
+
+    [HttpPost]
+    public JsonResult Delete(int id)
+    {
+        using (SqliteConnection con = new SqliteConnection("Data Source = db.sqlite"))
         {
-            using (SqliteConnection con =
-                   new SqliteConnection("Data Source=db.sqlite"))
+            using (var tableCmd = con.CreateCommand())
             {
-                using (var tableCmd = con.CreateCommand())
+                con.Open();
+                tableCmd.CommandText = $"DELETE from ToDo WHERE Id = '{id}'";
+                tableCmd.ExecuteNonQuery();
+            }
+        }
+        return Json(new { });  //we dont need to return anything
+    }
+
+    public RedirectResult Update(ToDoItem toDo)
+    {
+        using (SqliteConnection con = new SqliteConnection("Data Source=db.sqlite"))
+        {
+            using (var tableCmd = con.CreateCommand())
+            {
+                con.Open();
+                tableCmd.CommandText = $"UPDATE toDo SET name = '{toDo.Name}' WHERE Id = '{toDo.Id}'";
+                try
                 {
-                    con.Open();
-                    tableCmd.CommandText = $"DELETE from todo WHERE Id = '{id}'";
                     tableCmd.ExecuteNonQuery();
                 }
-            }
-
-            return Json(new {});
-        }
-
-        public RedirectResult Update(TodoItem todo)
-        {
-            using (SqliteConnection con =
-                   new SqliteConnection("Data Source=db.sqlite"))
-            {
-                using (var tableCmd = con.CreateCommand())
+                catch (Exception ex)
                 {
-                    con.Open();
-                    tableCmd.CommandText = $"UPDATE todo SET name = '{todo.Name}' WHERE Id = '{todo.Id}'";
-                    try
-                    {
-                        tableCmd.ExecuteNonQuery();
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex.Message);
-                    }
+                    System.Console.WriteLine(ex.Message);
                 }
             }
-
-            return Redirect("https://localhost:5001/");
         }
+        return Redirect("http://localhost:5146");
+
     }
+
 }
